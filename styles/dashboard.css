@@ -1,0 +1,42 @@
+/* styles/dashboard.css */
+body {
+    min-height: 100vh;
+    background-color: #f8f9fa;
+    display: flex;
+  }
+  
+  #wrapper {
+    display: flex;
+    width: 100%;
+  }
+  
+  #sidebar-wrapper {
+    min-width: 250px;
+    max-width: 250px;
+    background: #343a40;
+    color: white;
+    height: 100vh;
+  }
+  
+  #page-content-wrapper {
+    width: 100%;
+  }
+  
+  .card {
+    border-radius: 10px;
+    padding: 1rem;
+    background: white;
+  }
+  
+  @media (max-width: 768px) {
+    #sidebar-wrapper {
+      display: none;
+    }
+  
+    #wrapper.toggled #sidebar-wrapper {
+      display: block;
+      position: absolute;
+      z-index: 1000;
+    }
+  }
+  
