@@ -1,3 +1,41 @@
+<?php
+include 'includes/db.php';
+session_start();
+
+$email = $password = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
+
+    if (empty($email) || empty($password)) {
+        $error = "Email and password are required.";
+    } else {
+        // Fetch id, name, and password hash
+        $stmt = $conn->prepare("SELECT id, name, password FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->store_result();
+
+        if ($stmt->num_rows === 1) {
+            $stmt->bind_result($id, $name, $hashed_password);
+            $stmt->fetch();
+
+            if (password_verify($password, $hashed_password)) {
+                $_SESSION['user_id'] = $id;
+                $_SESSION['user_name'] = $name; 
+                header('Location: dashboard.php');
+                exit;
+            } else {
+                $error = "Invalid email or password.";
+            }
+        } else {
+            $error = "Invalid email or password.";
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,12 +46,17 @@
   <link rel="stylesheet" href="./styles/login.css">
 </head>
 <body>
-  <div class="login-card col-md-4">
+  <div class="login-card col-md-4 mx-auto mt-5">
     <h3 class="text-center mb-4">Login to Your Account</h3>
-    <form action="dashboard.php" method="POST">
+
+    <?php if ($error): ?>
+      <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <form method="POST">
       <div class="mb-3">
         <label for="email" class="form-label">Email Address</label>
-        <input type="email" class="form-control" id="email" name="email" required>
+        <input type="email" class="form-control" id="email" name="email" value="<?= htmlspecialchars($email) ?>" required>
       </div>
       <div class="mb-3 position-relative">
         <label for="password" class="form-label">Password</label>
@@ -29,15 +72,13 @@
       <div class="d-grid">
         <button type="submit" class="btn btn-primary">Login</button>
       </div>
-      <p class="text-center mt-3">Don't have an account? <a href="register.html">Register here</a></p>
+      <p class="text-center mt-3">Don't have an account? <a href="register.php">Register here</a></p>
       <p class="text-center"><a href="#">Forgot Password?</a></p>
     </form>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.js"></script>
   <script>
-    // Password visibility toggle
     const togglePasswordIcon = document.getElementById('togglePasswordIcon');
     const passwordField = document.getElementById('password');
 
