@@ -13,31 +13,56 @@ if (!isset($_SESSION['user_id'])) {
   <title>Dashboard - Student Peer-to-Peer Learning Network</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="./styles/dashboard.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
 </head>
 <body>
   <div class="d-flex" id="wrapper">
     <!-- Sidebar -->
     <div class="bg-dark text-white" id="sidebar-wrapper">
       <div class="sidebar-heading text-center py-4 fs-4 fw-bold">Dashboard</div>
-      <div class="list-group list-group-flush">
-        <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Profile</a>
-        <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Discussions</a>
-        <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Joined Groups</a>
-        <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Resources</a>
-        <a href="logout.php" class="list-group-item list-group-item-action bg-dark text-white">Logout</a>
-      </div>
+        <div class="list-group list-group-flush">
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">
+            <i class="bi bi-chat-dots me-2"></i> Discussions
+          </a>
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">
+            <i class="bi bi-people me-2"></i> Joined Groups
+          </a>
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">
+            <i class="bi bi-folder2-open me-2"></i> Resources
+          </a>
+        </div>
     </div>
 
     <!-- Page Content -->
     <div id="page-content-wrapper" class="w-100">
-      <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-        <div class="container-fluid">
-          <button class="btn btn-dark" id="menu-toggle">☰</button>
-          <h3 class="ms-3 mb-0">Welcome Back, <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Student'); ?>!</h3>
-        </div>
-      </nav>
+     <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+      <div class="container-fluid">
+        <button class="btn btn-dark" id="menu-toggle">☰</button>
 
+        <div class="dropdown ms-auto">
+          <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="https://via.placeholder.com/40" alt="User" width="40" height="40" class="rounded-circle">
+          </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userDropdown">
+              <li>
+                <a class="dropdown-item" href="profile.php">
+                  <i class="bi bi-person me-2"></i> Profile
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="logout.php">
+                  <i class="bi bi-box-arrow-right me-2"></i> Logout
+                </a>
+              </li>
+            </ul>
+        </div>
+      </div>
+    </nav>
+
+       <h3 class="ms-3 mb-0">Welcome Back, <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Student'); ?>!</h3>
       <div class="container-fluid mt-4">
+        
         <div class="row">
           <!-- Joined Groups -->
           <div class="col-md-4 mb-4">
