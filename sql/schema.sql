@@ -48,3 +48,6 @@ CREATE TABLE resources (
 
 ALTER TABLE users
 ADD COLUMN phone VARCHAR(20) AFTER email;
+
+ALTER TABLE users
+ADD profile_pic VARCHAR(255) DEFAULT NULL;

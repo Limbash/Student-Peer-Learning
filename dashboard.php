@@ -4,7 +4,31 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
+
+// DB connection (update with your DB details)
+$conn = new mysqli("localhost", "root", "", "peer_learning_db");
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Fetch profile pic
+$user_id = $_SESSION['user_id'];
+$stmt = $conn->prepare("SELECT profile_pic FROM users WHERE id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stmt->bind_result($profile_pic);
+$stmt->fetch();
+$stmt->close();
+
+// Fallback if no profile pic
+$profile_pic = $profile_pic ?: 'images/default.png';
+
+$result = $conn->query("SELECT COUNT(*) AS total FROM groups");
+$row = $result->fetch_assoc();
+$discussion_count = $row['total'];
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,7 +46,7 @@ if (!isset($_SESSION['user_id'])) {
     <div class="bg-dark text-white" id="sidebar-wrapper">
       <div class="sidebar-heading text-center py-4 fs-4 fw-bold">Dashboard</div>
         <div class="list-group list-group-flush">
-          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">
+          <a href="discussions.php" class="list-group-item list-group-item-action bg-dark text-white">
             <i class="bi bi-chat-dots me-2"></i> Discussions
           </a>
           <a href="#" class="list-group-item list-group-item-action bg-dark text-white">
@@ -39,23 +63,22 @@ if (!isset($_SESSION['user_id'])) {
      <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
       <div class="container-fluid">
         <button class="btn btn-dark" id="menu-toggle">☰</button>
-
         <div class="dropdown ms-auto">
           <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-            <img src="https://via.placeholder.com/40" alt="User" width="40" height="40" class="rounded-circle">
+            <img src="<?= htmlspecialchars($profile_pic ?: 'images/default.png') ?>" alt="User" width="40" height="40" class="rounded-circle" style="object-fit: cover;">
           </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userDropdown">
-              <li>
-                <a class="dropdown-item" href="profile.php">
-                  <i class="bi bi-person me-2"></i> Profile
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item" href="logout.php">
-                  <i class="bi bi-box-arrow-right me-2"></i> Logout
-                </a>
-              </li>
-            </ul>
+          <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userDropdown">
+            <li>
+              <a class="dropdown-item" href="profile.php">
+                <i class="bi bi-person me-2"></i> Profile
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="logout.php">
+                <i class="bi bi-box-arrow-right me-2"></i> Logout
+              </a>
+            </li>
+          </ul>
         </div>
       </div>
     </nav>
@@ -80,8 +103,8 @@ if (!isset($_SESSION['user_id'])) {
             <div class="card border-0 shadow-sm">
               <div class="card-body">
                 <h5 class="card-title">Discussions</h5>
-                <p class="card-text">There are <strong>5</strong> new discussion threads.</p>
-                <a href="#" class="btn btn-outline-primary btn-sm">View Discussions</a>
+                <p class="card-text">There are <strong><?php echo $discussion_count; ?></strong> discussion groups.</p>
+                <a href="discussions.php" class="btn btn-outline-primary btn-sm">View Discussions</a>
               </div>
             </div>
           </div>
