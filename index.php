@@ -37,8 +37,8 @@
         <ul class="navbar-nav">
           <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
-          <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
-          <li class="nav-item"><a class="nav-link" href="register.html">Register</a></li>
+          <li class="nav-item"><a class="nav-link" href="login.php">Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="register.php">Register</a></li>
         </ul>
       </div>
     </div>
@@ -48,7 +48,7 @@
   <section class="hero-section">
     <h1>Welcome to the Student Peer-to-Peer Learning Network</h1>
     <p>Join us to share knowledge, collaborate, and grow together!</p>
-    <a href="register.html" class="btn btn-light mt-3">Get Started</a>
+    <a href="register.php" class="btn btn-light mt-3">Get Started</a>
   </section>
 
   <!-- Features Section -->
@@ -79,7 +79,7 @@
   <div class="container text-center mt-5">
     <h2>Ready to Start Learning?</h2>
     <p class="lead">Connect with peers and access countless learning resources now!</p>
-    <a href="register.html" class="btn btn-success mt-3">Join Now</a>
+    <a href="register.php" class="btn btn-success mt-3">Join Now</a>
   </div>
 
   <!-- Footer -->
