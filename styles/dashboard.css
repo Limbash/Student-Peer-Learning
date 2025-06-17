@@ -39,4 +39,34 @@ body {
       z-index: 1000;
     }
   }
-  
+  /* Dashboard specific styles */
+.dashboard-card {
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.activity-item {
+    border-left: 3px solid #4e73df;
+    padding-left: 15px;
+    margin-bottom: 15px;
+}
+
+@media (max-width: 768px) {
+    .dashboard-card {
+        margin-bottom: 20px;
+    }
+}

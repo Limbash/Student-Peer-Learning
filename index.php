@@ -23,7 +23,35 @@
       background: white;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
+    .hero-section {
+    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+                url('img/learn.png') center/cover no-repeat;
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+  }
+     /* Improved responsive styles */
+  @media (max-width: 768px) {
+    .hero-section {
+      padding: 2rem 1rem;
+    }
+    .feature-card {
+      margin: 0.5rem 0;
+    }
+    .navbar-brand {
+      font-size: 1.2rem;
+    }
+  }
   </style>
+  <!-- Add this to head -->
+
+<style>
+ 
+</style>
 </head>
 <body>
   <!-- Navigation Bar -->
