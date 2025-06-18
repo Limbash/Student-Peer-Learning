@@ -24,11 +24,13 @@ if (!$stmt->get_result()->num_rows) {
 $stmt->close();
 
 // Get group info
-$group = $conn->query("SELECT name FROM groups WHERE id = $group_id")->fetch_assoc();
+$group = $conn->query("SELECT name, last_message_at FROM groups WHERE id = $group_id")->fetch_assoc();
 
-// Get chat messages (last 50)
+// Get chat messages (last 50) with reactions
 $messages = $conn->query("
-    SELECT gc.*, u.name AS user_name, u.profile_pic
+    SELECT gc.*, u.name AS user_name, u.profile_pic,
+           (SELECT GROUP_CONCAT(CONCAT(reaction, ':', reactor_id) SEPARATOR ',') 
+            FROM message_reactions WHERE message_id = gc.id) AS reactions
     FROM group_chats gc
     JOIN users u ON gc.user_id = u.id
     WHERE gc.group_id = $group_id
@@ -55,13 +57,32 @@ $conn->close();
             <div id="chat-messages" class="p-3" style="height: 500px; overflow-y: auto;">
                 <?php if ($messages->num_rows > 0): ?>
                     <?php while($message = $messages->fetch_assoc()): ?>
-                        <div class="mb-3 d-flex <?= $message['user_id'] == $_SESSION['user_id'] ? 'justify-content-end' : 'justify-content-start' ?>">
+                        <div class="mb-3 d-flex <?= $message['user_id'] == $_SESSION['user_id'] ? 'justify-content-end' : 'justify-content-start' ?>" data-message-id="<?= $message['id'] ?>">
                             <div class="d-flex <?= $message['user_id'] == $_SESSION['user_id'] ? 'flex-row-reverse' : '' ?>">
                                 <img src="<?= htmlspecialchars($message['profile_pic'] ?? 'images/default.png') ?>" 
                                      class="rounded-circle me-2" width="40" height="40" alt="<?= htmlspecialchars($message['user_name']) ?>">
                                 <div>
-                                    <div class="bg-<?= $message['user_id'] == $_SESSION['user_id'] ? 'primary' : 'light' ?> text-<?= $message['user_id'] == $_SESSION['user_id'] ? 'white' : 'dark' ?> p-3 rounded-3">
+                                    <div class="bg-<?= $message['user_id'] == $_SESSION['user_id'] ? 'primary' : 'light' ?> text-<?= $message['user_id'] == $_SESSION['user_id'] ? 'white' : 'dark' ?> p-3 rounded-3 position-relative">
                                         <?= nl2br(htmlspecialchars($message['message'])) ?>
+                                        <!-- File Preview (if attachment exists) -->
+                                        <?php if (!empty($message['attachment'])): ?>
+                                            <div class="mt-2">
+                                                <a href="uploads/<?= htmlspecialchars($message['attachment']) ?>" target="_blank" class="d-block">
+                                                    <i class="bi bi-file-earmark"></i> <?= htmlspecialchars($message['attachment']) ?>
+                                                </a>
+                                            </div>
+                                        <?php endif; ?>
+                                        <!-- Reactions -->
+                                        <?php if (!empty($message['reactions'])): ?>
+                                            <div class="reactions mt-2">
+                                                <?php foreach (explode(',', $message['reactions']) as $reaction): ?>
+                                                    <?php list($emoji, $reactor_id) = explode(':', $reaction); ?>
+                                                    <span class="badge bg-light text-dark me-1 reaction-emoji" data-emoji="<?= $emoji ?>" data-message-id="<?= $message['id'] ?>">
+                                                        <?= $emoji ?>
+                                                    </span>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                     <small class="text-muted d-block <?= $message['user_id'] == $_SESSION['user_id'] ? 'text-end' : '' ?>">
                                         <?= htmlspecialchars($message['user_name']) ?> • 
@@ -81,13 +102,24 @@ $conn->close();
 
             <!-- Message Input Form -->
             <div class="border-top p-3 bg-light">
-                <form id="chat-form" class="d-flex">
+                <form id="chat-form" class="d-flex" enctype="multipart/form-data">
                     <input type="hidden" name="group_id" value="<?= $group_id ?>">
-                    <input type="text" name="message" class="form-control me-2" placeholder="Type your message..." required>
-                    <button type="submit" class="btn btn-primary">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <input type="text" name="message" class="form-control me-2" placeholder="Type your message...">
+                    <label class="btn btn-outline-secondary me-2">
+                        <i class="bi bi-paperclip"></i>
+                        <input type="file" name="attachment" id="attachment" class="d-none" accept=".pdf,.jpg,.jpeg,.png">
+                    </label>
+                    <button type="submit" class="btn btn-primary" id="send-button">
                         <i class="bi bi-send"></i> Send
                     </button>
                 </form>
+                <div id="file-preview" class="mt-2 d-none">
+                    <span class="badge bg-info">
+                        <span id="file-name"></span>
+                        <button class="btn-close btn-close-white ms-1" id="remove-file"></button>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -95,22 +127,52 @@ $conn->close();
 
 <?php include 'partials/footer.php'; ?>
 
-<!-- Chat JavaScript -->
+<!-- Emoji Picker (for reactions) -->
+<div id="emoji-picker" class="position-fixed bg-white p-3 shadow rounded d-none">
+    <div class="emoji-list">
+        <?php foreach (['👍', '❤️', '😂', '😮', '😢'] as $emoji): ?>
+            <span class="emoji-option fs-4 me-2" data-emoji="<?= $emoji ?>"><?= $emoji ?></span>
+        <?php endforeach; ?>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const chatForm = document.getElementById('chat-form');
     const chatMessages = document.getElementById('chat-messages');
-    
-    // Scroll to bottom of chat
+    const attachmentInput = document.getElementById('attachment');
+    const filePreview = document.getElementById('file-preview');
+    const fileName = document.getElementById('file-name');
+    const removeFileBtn = document.getElementById('remove-file');
+    const sendButton = document.getElementById('send-button');
+    const emojiPicker = document.getElementById('emoji-picker');
+
+    // Scroll to bottom initially
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
+    // Handle file selection
+    attachmentInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            fileName.textContent = e.target.files[0].name;
+            filePreview.classList.remove('d-none');
+        }
+    });
+
+    // Remove file
+    removeFileBtn.addEventListener('click', function() {
+        attachmentInput.value = '';
+        filePreview.classList.add('d-none');
+    });
+
     // Handle message submission
     chatForm.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sending...';
+
         const formData = new FormData(this);
         formData.append('action', 'send_message');
-        
+
         fetch('chat_ajax.php', {
             method: 'POST',
             body: formData
@@ -118,55 +180,137 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                this.reset();
-                // Message will appear via polling
+                chatForm.reset();
+                filePreview.classList.add('d-none');
             }
+        })
+        .finally(() => {
+            sendButton.disabled = false;
+            sendButton.innerHTML = '<i class="bi bi-send"></i> Send';
         });
     });
-    
-    // Poll for new messages every 3 seconds
+
+    // Poll for new messages every 2 seconds
     setInterval(function() {
         fetch(`chat_ajax.php?action=get_messages&group_id=<?= $group_id ?>&last_id=${getLastMessageId()}`)
         .then(response => response.json())
         .then(messages => {
             if (messages.length > 0) {
                 messages.forEach(message => {
-                    const isCurrentUser = message.user_id == <?= $_SESSION['user_id'] ?>;
-                    const messageHtml = `
-                        <div class="mb-3 d-flex ${isCurrentUser ? 'justify-content-end' : 'justify-content-start'}">
-                            <div class="d-flex ${isCurrentUser ? 'flex-row-reverse' : ''}">
-                                <img src="${message.profile_pic || 'images/default.png'}" 
-                                     class="rounded-circle me-2" width="40" height="40" alt="${message.user_name}">
-                                <div>
-                                    <div class="bg-${isCurrentUser ? 'primary' : 'light'} text-${isCurrentUser ? 'white' : 'dark'} p-3 rounded-3">
-                                        ${escapeHtml(message.message).replace(/\n/g, '<br>')}
-                                    </div>
-                                    <small class="text-muted d-block ${isCurrentUser ? 'text-end' : ''}">
-                                        ${message.user_name} • 
-                                        ${formatDate(message.sent_at)}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    chatMessages.insertAdjacentHTML('beforeend', messageHtml);
+                    // Check if message already exists
+                    if (!document.querySelector(`[data-message-id="${message.id}"]`)) {
+                        const isCurrentUser = message.user_id == <?= $_SESSION['user_id'] ?>;
+                        const messageHtml = buildMessageHtml(message, isCurrentUser);
+                        chatMessages.insertAdjacentHTML('beforeend', messageHtml);
+                    }
                 });
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Auto-scroll only if near bottom
+                const isNearBottom = chatMessages.scrollHeight - chatMessages.scrollTop <= chatMessages.clientHeight + 100;
+                if (isNearBottom) chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         });
-    }, 3000);
-    
+    }, 2000);
+
+    // Reaction click handler (delegated)
+    chatMessages.addEventListener('click', function(e) {
+        if (e.target.classList.contains('reaction-emoji')) {
+            const messageId = e.target.dataset.messageId;
+            const emoji = e.target.dataset.emoji;
+            toggleReaction(messageId, emoji);
+        }
+    });
+
+    // Helper functions
     function getLastMessageId() {
-        const lastMessage = chatMessages.lastElementChild;
-        return lastMessage ? lastMessage.dataset.messageId || '0' : '0';
+        const messages = chatMessages.querySelectorAll('[data-message-id]');
+        return messages.length ? messages[messages.length - 1].dataset.messageId : '0';
     }
-    
+
+    function buildMessageHtml(message, isCurrentUser) {
+        let fileHtml = '';
+        if (message.attachment) {
+            fileHtml = `
+                <div class="mt-2">
+                    <a href="uploads/${escapeHtml(message.attachment)}" target="_blank" class="d-block">
+                        <i class="bi bi-file-earmark"></i> ${escapeHtml(message.attachment)}
+                    </a>
+                </div>
+            `;
+        }
+
+        let reactionsHtml = '';
+        if (message.reactions) {
+            reactionsHtml = `
+                <div class="reactions mt-2">
+                    ${message.reactions.split(',').map(reaction => {
+                        const [emoji, reactor_id] = reaction.split(':');
+                        return `
+                            <span class="badge bg-light text-dark me-1 reaction-emoji" 
+                                  data-emoji="${emoji}" 
+                                  data-message-id="${message.id}">
+                                ${emoji}
+                            </span>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        return `
+            <div class="mb-3 d-flex ${isCurrentUser ? 'justify-content-end' : 'justify-content-start'}" data-message-id="${message.id}">
+                <div class="d-flex ${isCurrentUser ? 'flex-row-reverse' : ''}">
+                    <img src="${escapeHtml(message.profile_pic || 'images/default.png')}" 
+                         class="rounded-circle me-2" width="40" height="40" alt="${escapeHtml(message.user_name)}">
+                    <div>
+                        <div class="bg-${isCurrentUser ? 'primary' : 'light'} text-${isCurrentUser ? 'white' : 'dark'} p-3 rounded-3 position-relative">
+                            ${escapeHtml(message.message).replace(/\n/g, '<br>')}
+                            ${fileHtml}
+                            ${reactionsHtml}
+                        </div>
+                        <small class="text-muted d-block ${isCurrentUser ? 'text-end' : ''}">
+                            ${escapeHtml(message.user_name)} • 
+                            ${formatDate(message.sent_at)}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function toggleReaction(messageId, emoji) {
+        fetch('chat_ajax.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `action=toggle_reaction&message_id=${messageId}&emoji=${encodeURIComponent(emoji)}&csrf_token=<?= $_SESSION['csrf_token'] ?>`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Refresh messages
+                const lastId = getLastMessageId();
+                fetch(`chat_ajax.php?action=get_messages&group_id=<?= $group_id ?>&last_id=${lastId}`)
+                .then(response => response.json())
+                .then(messages => {
+                    const updatedMessage = messages.find(m => m.id == messageId);
+                    if (updatedMessage) {
+                        const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+                        if (messageEl) {
+                            const isCurrentUser = updatedMessage.user_id == <?= $_SESSION['user_id'] ?>;
+                            messageEl.outerHTML = buildMessageHtml(updatedMessage, isCurrentUser);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
     function formatDate(dateString) {
         const date = new Date(dateString);
         return date.toLocaleString('en-US', {

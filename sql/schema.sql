@@ -159,3 +159,16 @@ ALTER TABLE group_chats ADD FULLTEXT INDEX ft_message (message);
 CREATE INDEX idx_group_chats_group ON group_chats(group_id, sent_at);
 CREATE INDEX idx_group_members_user ON group_members(user_id);
 CREATE INDEX idx_notifications_user ON notifications(user_id, is_read);
+
+ALTER TABLE group_chats ADD COLUMN attachment VARCHAR(255) AFTER message;
+
+CREATE TABLE message_reactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    message_id INT NOT NULL,
+    reactor_id INT NOT NULL,
+    reaction VARCHAR(10) NOT NULL,
+    reacted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (message_id) REFERENCES group_chats(id) ON DELETE CASCADE,
+    FOREIGN KEY (reactor_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY (message_id, reactor_id, reaction)
+);

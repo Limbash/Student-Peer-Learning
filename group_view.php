@@ -114,6 +114,18 @@ $resources = $conn->query("
     WHERE r.group_id = $group_id
     ORDER BY r.uploaded_at DESC
 ");
+
+// Fetch last 5 chat messages
+$chat_messages = $is_member ? $conn->query("
+    SELECT gc.*, u.name AS user_name, u.profile_pic
+    FROM group_chats gc
+    JOIN users u ON gc.user_id = u.id
+    WHERE gc.group_id = $group_id
+    ORDER BY gc.sent_at DESC
+    LIMIT 5
+") : null;
+
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -156,6 +168,43 @@ $resources = $conn->query("
             font-weight: bold;
             border-bottom: 3px solid #4e73df;
         }
+        .chat-container {
+            position: fixed;
+            bottom: 0;
+            right: 20px;
+            width: 350px;
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .chat-header {
+            background: #4e73df;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+        }
+        .chat-body {
+            background: white;
+            height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+        }
+        .chat-input {
+            border-top: 1px solid #eee;
+            padding: 10px;
+            background: #f8f9fa;
+            display: none;
+        }
+        .chat-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -187,13 +236,18 @@ $resources = $conn->query("
                     </div>
                     
                     <?php if ($is_member): ?>
-                        <form method="POST">
-                            <input type="hidden" name="leave_group" value="1">
-                            <button type="submit" class="btn btn-outline-light btn-sm" 
-                                    onclick="return confirm('Are you sure you want to leave this group?')">
-                                <i class="bi bi-box-arrow-right me-1"></i> Leave Group
-                            </button>
-                        </form>
+                        <div>
+                            <a href="group_chat.php?group_id=<?= $group_id ?>" class="btn btn-light btn-sm me-2">
+                                <i class="bi bi-chat-left-text me-1"></i> Open Chat
+                            </a>
+                            <form method="POST" style="display: inline-block;">
+                                <input type="hidden" name="leave_group" value="1">
+                                <button type="submit" class="btn btn-outline-light btn-sm" 
+                                        onclick="return confirm('Are you sure you want to leave this group?')">
+                                    <i class="bi bi-box-arrow-right me-1"></i> Leave Group
+                                </button>
+                            </form>
+                        </div>
                     <?php else: ?>
                         <form method="POST">
                             <input type="hidden" name="join_group" value="1">
@@ -381,6 +435,96 @@ $resources = $conn->query("
             </div>
         </div>
     </div>
+
+    <!-- Group Chat Widget -->
+    <?php if ($is_member): ?>
+    <div class="chat-container">
+        <div class="chat-header d-flex justify-content-between align-items-center">
+            <button class="chat-toggle">
+                <i class="bi bi-chat-left-text me-2"></i> Group Chat
+            </button>
+            <a href="group_chat.php?group_id=<?= $group_id ?>" class="text-white">
+                <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+        </div>
+        <div class="chat-body p-3" id="chat-widget-body">
+            <?php if ($chat_messages && $chat_messages->num_rows > 0): ?>
+                <?php while($message = $chat_messages->fetch_assoc()): ?>
+                    <div class="chat-message">
+                        <div class="d-flex <?= $message['user_id'] == $_SESSION['user_id'] ? 'justify-content-end' : 'justify-content-start' ?>">
+                            <div class="d-flex <?= $message['user_id'] == $_SESSION['user_id'] ? 'flex-row-reverse' : '' ?>">
+                                <img src="<?= htmlspecialchars($message['profile_pic'] ?? 'images/default.png') ?>" 
+                                     class="rounded-circle me-2" width="30" height="30" alt="<?= htmlspecialchars($message['user_name']) ?>">
+                                <div>
+                                    <div class="bg-<?= $message['user_id'] == $_SESSION['user_id'] ? 'primary' : 'light' ?> text-<?= $message['user_id'] == $_SESSION['user_id'] ? 'white' : 'dark' ?> p-2 rounded-3">
+                                        <?= nl2br(htmlspecialchars($message['message'])) ?>
+                                    </div>
+                                    <small class="text-muted d-block <?= $message['user_id'] == $_SESSION['user_id'] ? 'text-end' : '' ?>">
+                                        <?= htmlspecialchars($message['user_name']) ?> • 
+                                        <?= date('g:i a', strtotime($message['sent_at'])) ?>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endwhile; ?>
+            <?php else: ?>
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-chat-square-text"></i>
+                    <p class="mt-2">No messages yet</p>
+                </div>
+            <?php endif; ?>
+        </div>
+        <div class="chat-input">
+            <form id="chat-widget-form" class="d-flex">
+                <input type="hidden" name="group_id" value="<?= $group_id ?>">
+                <input type="text" name="message" class="form-control me-2" placeholder="Type a message..." required>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-send"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    // Toggle chat widget
+    document.querySelector('.chat-toggle').addEventListener('click', function() {
+        const chatBody = document.querySelector('.chat-body');
+        const chatInput = document.querySelector('.chat-input');
+        
+        if (chatBody.style.display === 'block') {
+            chatBody.style.display = 'none';
+            chatInput.style.display = 'none';
+        } else {
+            chatBody.style.display = 'block';
+            chatInput.style.display = 'block';
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+    });
+
+    // Handle chat form submission
+    document.getElementById('chat-widget-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        formData.append('action', 'send_message');
+        
+        fetch('chat_ajax.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.reset();
+                // In a real implementation, you'd add the new message to the chat
+                // and scroll to bottom. This is simplified for the example.
+                location.reload();
+            }
+        });
+    });
+    </script>
+    <?php endif; ?>
 
     <?php include 'partials/footer.php'; ?>
     

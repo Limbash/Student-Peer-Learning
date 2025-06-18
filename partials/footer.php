@@ -12,7 +12,7 @@
                         <ul class="list-unstyled">
                             <li><a href="../index.php" class="text-white">Home</a></li>
                             <li><a href="../discussions.php" class="text-white">Discussions</a></li>
-                            <li><a href="#" class="text-white">Resources</a></li>
+                            <li><a href="../resources.php" class="text-white">Resources</a></li>
                             <li><a href="#" class="text-white">About Us</a></li>
                         </ul>
                     </div>
@@ -20,8 +20,8 @@
                         <h5>Contact Us</h5>
                         <ul class="list-unstyled">
                             <li><i class="bi bi-envelope me-2"></i> support@peerlearning.com</li>
-                            <li><i class="bi bi-phone me-2"></i> +123 456 7890</li>
-                            <li><i class="bi bi-geo-alt me-2"></i> University Campus</li>
+                            <li><i class="bi bi-phone me-2"></i> +234 7072 130 442</li>
+                            <li><i class="bi bi-geo-alt me-2"></i> Al-Qalam University Katsina</li>
                         </ul>
                     </div>
                 </div>
