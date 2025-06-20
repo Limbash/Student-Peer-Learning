@@ -12,22 +12,23 @@ if (!$group_id) {
     die("Invalid group ID.");
 }
 
-// Check if user is a member
+// Check if user is a member and their role
 $user_id = $_SESSION['user_id'];
 $is_member = false;
 $is_admin = false;
+$is_creator = false;
 
-$member_stmt = $conn->prepare("SELECT is_admin FROM group_members WHERE user_id = ? AND group_id = ?");
+$member_stmt = $conn->prepare("SELECT is_admin, is_creator FROM group_members WHERE user_id = ? AND group_id = ?");
 $member_stmt->bind_param("ii", $user_id, $group_id);
 $member_stmt->execute();
-$member_stmt->bind_result($is_admin);
+$member_stmt->bind_result($is_admin, $is_creator);
 $is_member = $member_stmt->fetch();
 $member_stmt->close();
 
-// Handle join/leave actions
+// Handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['join_group'])) {
-        $stmt = $conn->prepare("INSERT INTO group_members (user_id, group_id) VALUES (?, ?)");
+        $stmt = $conn->prepare("INSERT INTO group_members (user_id, group_id, is_admin, is_creator) VALUES (?, ?, FALSE, FALSE)");
         $stmt->bind_param("ii", $user_id, $group_id);
         
         if ($stmt->execute()) {
@@ -64,6 +65,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
     }
     
+    if (isset($_POST['delete_group'])) {
+        // Verify user is admin/creator before deleting
+        if ($is_admin || $is_creator) {
+            // Start transaction
+            $conn->begin_transaction();
+            
+            try {
+                // Delete group activities
+                $stmt = $conn->prepare("DELETE FROM group_activities WHERE group_id = ?");
+                $stmt->bind_param("i", $group_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Delete group members
+                $stmt = $conn->prepare("DELETE FROM group_members WHERE group_id = ?");
+                $stmt->bind_param("i", $group_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Delete group resources
+                $stmt = $conn->prepare("DELETE FROM resources WHERE group_id = ?");
+                $stmt->bind_param("i", $group_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Delete group chats
+                $stmt = $conn->prepare("DELETE FROM group_chats WHERE group_id = ?");
+                $stmt->bind_param("i", $group_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                // Finally delete the group
+                $stmt = $conn->prepare("DELETE FROM groups WHERE id = ?");
+                $stmt->bind_param("i", $group_id);
+                $stmt->execute();
+                $stmt->close();
+                
+                $conn->commit();
+                $_SESSION['success'] = "Group deleted successfully.";
+                header("Location: discussions.php");
+                exit;
+            } catch (Exception $e) {
+                $conn->rollback();
+                $_SESSION['error'] = "Error deleting group: " . $e->getMessage();
+            }
+        } else {
+            $_SESSION['error'] = "You don't have permission to delete this group.";
+        }
+    }
+    
     // Update last accessed time
     if ($is_member) {
         $conn->query("UPDATE group_members SET last_accessed = NOW() WHERE user_id = $user_id AND group_id = $group_id");
@@ -89,11 +140,11 @@ if (!$group) {
 
 // Fetch members with their roles
 $members = $conn->query("
-    SELECT u.id, u.name, u.profile_pic, gm.is_admin, gm.joined_at
+    SELECT u.id, u.name, u.profile_pic, gm.is_admin, gm.is_creator, gm.joined_at
     FROM group_members gm
     JOIN users u ON gm.user_id = u.id
     WHERE gm.group_id = $group_id
-    ORDER BY gm.is_admin DESC, gm.joined_at ASC
+    ORDER BY gm.is_creator DESC, gm.is_admin DESC, gm.joined_at ASC
 ");
 
 // Fetch recent activities
@@ -154,6 +205,14 @@ $conn->close();
         .admin-badge {
             background-color: #f6c23e;
             color: #000;
+            font-size: 0.7rem;
+            padding: 2px 5px;
+            border-radius: 3px;
+            margin-left: 5px;
+        }
+        .creator-badge {
+            background-color: #4e73df;
+            color: #fff;
             font-size: 0.7rem;
             padding: 2px 5px;
             border-radius: 3px;
@@ -240,15 +299,29 @@ $conn->close();
                             <a href="group_chat.php?group_id=<?= $group_id ?>" class="btn btn-light btn-sm me-2">
                                 <i class="bi bi-chat-left-text me-1"></i> Open Chat
                             </a>
-                            <form method="POST" style="display: inline-block;">
-                                <input type="hidden" name="leave_group" value="1">
-                                <button type="submit" class="btn btn-outline-light btn-sm" 
-                                        onclick="return confirm('Are you sure you want to leave this group?')">
-                                    <i class="bi bi-box-arrow-right me-1"></i> Leave Group
-                                </button>
-                            </form>
+                            
+                            <?php if ($is_admin || $is_creator): ?>
+                                <!-- Delete Group button for admins/creators -->
+                                <form method="POST" style="display: inline-block;">
+                                    <input type="hidden" name="delete_group" value="1">
+                                    <button type="submit" class="btn btn-danger btn-sm" 
+                                            onclick="return confirm('WARNING: This will permanently delete the group and all its content! Are you sure?')">
+                                        <i class="bi bi-trash me-1"></i> Delete Group
+                                    </button>
+                                </form>
+                            <?php else: ?>
+                                <!-- Leave Group button for regular members -->
+                                <form method="POST" style="display: inline-block;">
+                                    <input type="hidden" name="leave_group" value="1">
+                                    <button type="submit" class="btn btn-outline-light btn-sm" 
+                                            onclick="return confirm('Are you sure you want to leave this group?')">
+                                        <i class="bi bi-box-arrow-right me-1"></i> Leave Group
+                                    </button>
+                                </form>
+                            <?php endif; ?>
                         </div>
                     <?php else: ?>
+                        <!-- Join Group button for non-members -->
                         <form method="POST">
                             <input type="hidden" name="join_group" value="1">
                             <button type="submit" class="btn btn-light btn-sm">
@@ -301,7 +374,9 @@ $conn->close();
                                     <div>
                                         <h6 class="mb-0">
                                             <?= htmlspecialchars($member['name']) ?>
-                                            <?php if ($member['is_admin']): ?>
+                                            <?php if ($member['is_creator']): ?>
+                                                <span class="creator-badge">CREATOR</span>
+                                            <?php elseif ($member['is_admin']): ?>
                                                 <span class="admin-badge">ADMIN</span>
                                             <?php endif; ?>
                                         </h6>
@@ -339,7 +414,7 @@ $conn->close();
                                        class="btn btn-sm btn-outline-primary" download>
                                         <i class="bi bi-download me-1"></i> Download
                                     </a>
-                                    <?php if ($is_admin): ?>
+                                    <?php if ($is_admin || $is_creator): ?>
                                         <button class="btn btn-sm btn-outline-danger">
                                             <i class="bi bi-trash me-1"></i> Delete
                                         </button>
@@ -517,8 +592,6 @@ $conn->close();
         .then(data => {
             if (data.success) {
                 this.reset();
-                // In a real implementation, you'd add the new message to the chat
-                // and scroll to bottom. This is simplified for the example.
                 location.reload();
             }
         });

@@ -172,3 +172,7 @@ CREATE TABLE message_reactions (
     FOREIGN KEY (reactor_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY (message_id, reactor_id, reaction)
 );
+
+-- Add is_creator column to group_members table
+ALTER TABLE group_members ADD COLUMN is_creator BOOLEAN DEFAULT FALSE;
+

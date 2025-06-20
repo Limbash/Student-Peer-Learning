@@ -1,4 +1,61 @@
 <?php
+// Only one session_start() at the very beginning
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$group_id = intval($_GET['group_id'] ?? 0);
+if (!$group_id) {
+    header('Location: discussions.php');
+    exit;
+}
+
+include 'includes/db.php';
+
+// Verify user is member of group
+$stmt = $conn->prepare("SELECT 1 FROM group_members WHERE user_id = ? AND group_id = ?");
+$stmt->bind_param("ii", $_SESSION['user_id'], $group_id);
+$stmt->execute();
+if (!$stmt->get_result()->num_rows) {
+    header("Location: group_view.php?id=$group_id");
+    exit;
+}
+$stmt->close();
+
+// Fixed: Removed last_message_at from query since it's not in your schema
+$stmt = $conn->prepare("SELECT name FROM groups WHERE id = ?");
+$stmt->bind_param("i", $group_id);
+$stmt->execute();
+$group = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$group) {
+    header("Location: discussions.php");
+    exit;
+}
+
+// Get chat messages
+$stmt = $conn->prepare("
+    SELECT gc.*, u.name AS user_name, u.profile_pic,
+           (SELECT GROUP_CONCAT(CONCAT(reaction, ':', reactor_id) SEPARATOR ',') 
+            FROM message_reactions WHERE message_id = gc.id) AS reactions
+    FROM group_chats gc
+    JOIN users u ON gc.user_id = u.id
+    WHERE gc.group_id = ?
+    ORDER BY gc.sent_at DESC
+    LIMIT 50
+");
+$stmt->bind_param("i", $group_id);
+$stmt->execute();
+$messages = $stmt->get_result();
+$stmt->close();
+
+$conn->close();
+?>
+
+<?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
