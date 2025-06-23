@@ -176,3 +176,10 @@ CREATE TABLE message_reactions (
 -- Add is_creator column to group_members table
 ALTER TABLE group_members ADD COLUMN is_creator BOOLEAN DEFAULT FALSE;
 
+-- admin panel
+CREATE TABLE admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
