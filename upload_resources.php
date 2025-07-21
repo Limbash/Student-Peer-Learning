@@ -69,33 +69,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $activity_stmt->bind_param("iis", $group_id, $user_id, $activity_details);
                 $activity_stmt->execute();
                 $activity_stmt->close();
+
+                // Get group name for notification
                 $group_name = $conn->query("SELECT name FROM groups WHERE id = $group_id")->fetch_assoc()['name'];
-$notification_title = "New Resource in $group_name";
-$notification_message = "A new resource '$title' has been uploaded to the group '$group_name'.";
-$notification->notifyGroupMembers(
-    $group_id, 
-    $user_id, 
-    'new_resource', 
-    $notification_title, 
-    $notification_message
-);
+                $notification_title = "New Resource in $group_name";
+                $notification_message = "A new resource '$title' has been uploaded to the group '$group_name'.";
+                $notification->notifyGroupMembers(
+                    $group_id, 
+                    $user_id, 
+                    'new_resource', 
+                    $notification_title, 
+                    $notification_message
+                );
                 
                 $_SESSION['success'] = "Resource uploaded successfully!";
+                
+                // Update last_accessed for the group member
+                $conn->query("UPDATE group_members SET last_accessed = NOW() WHERE user_id = $user_id AND group_id = $group_id");
+                
+                // Redirect to resources page to show the new upload
+                header("Location: resources.php");
+                exit;
             } else {
                 $_SESSION['error'] = "Error saving resource to database.";
                 unlink($target_path); // Delete the uploaded file
+                header("Location: group_view.php?id=$group_id");
+                exit;
             }
             $stmt->close();
         } else {
             $_SESSION['error'] = "Error uploading file.";
+            header("Location: group_view.php?id=$group_id");
+            exit;
         }
     } else {
         $_SESSION['error'] = "No file uploaded or upload error occurred.";
+        header("Location: group_view.php?id=$group_id");
+        exit;
     }
-    
-    header("Location: group_view.php?id=$group_id");
-    exit;
 }
 
+// If not a POST request, redirect to discussions
 header("Location: discussions.php");
 exit;
+?>
