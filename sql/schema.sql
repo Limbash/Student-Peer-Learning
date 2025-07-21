@@ -146,6 +146,20 @@ CREATE TABLE `resource_access_log` (
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE `message_reactions` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `message_id` INT NOT NULL,
+  `reactor_id` INT NOT NULL,
+  `reaction` VARCHAR(10) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`message_id`) REFERENCES `group_chats`(`id`),
+  FOREIGN KEY (`reactor_id`) REFERENCES `users`(`id`),
+  UNIQUE KEY `unique_reaction` (`message_id`, `reactor_id`, `reaction`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE group_members
+ADD COLUMN is_creator TINYINT(1) NOT NULL DEFAULT 0,
+MODIFY COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0;
 
 -- CREATE TABLE resources (
 --     id INT AUTO_INCREMENT PRIMARY KEY,
