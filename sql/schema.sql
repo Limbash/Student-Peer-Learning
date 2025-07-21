@@ -137,17 +137,27 @@ CREATE TABLE IF NOT EXISTS group_chats (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE resources (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    group_id INT NOT NULL,
-    uploaded_by INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    filename VARCHAR(255) NOT NULL,
-    description TEXT,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (group_id) REFERENCES groups(id),
-    FOREIGN KEY (uploaded_by) REFERENCES users(id)
-);
+CREATE TABLE `resource_access_log` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `resource_id` int(11) NOT NULL,
+  `access_time` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+  FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- CREATE TABLE resources (
+--     id INT AUTO_INCREMENT PRIMARY KEY,
+--     group_id INT NOT NULL,
+--     uploaded_by INT NOT NULL,
+--     title VARCHAR(255) NOT NULL,
+--     filename VARCHAR(255) NOT NULL,
+--     description TEXT,
+--     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (group_id) REFERENCES groups(id),
+--     FOREIGN KEY (uploaded_by) REFERENCES users(id)
+-- );
 
 -- Chat message status (for read receipts)
 CREATE TABLE IF NOT EXISTS chat_message_status (
