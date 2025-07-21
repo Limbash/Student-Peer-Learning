@@ -137,6 +137,18 @@ CREATE TABLE IF NOT EXISTS group_chats (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE resources (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    group_id INT NOT NULL,
+    uploaded_by INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    description TEXT,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES groups(id),
+    FOREIGN KEY (uploaded_by) REFERENCES users(id)
+);
+
 -- Chat message status (for read receipts)
 CREATE TABLE IF NOT EXISTS chat_message_status (
     id INT AUTO_INCREMENT PRIMARY KEY,
